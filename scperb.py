@@ -31,9 +31,11 @@ def print_res(stim):
     print("var:", var)
     print("median", mid)
 
-def validation(opt, model, get_result = False):
+def validation(opt, model, dataset, get_result = False):
     opt.validation = True
-    dataloader = torch.utils.data.DataLoader(dataset = dataset, batch_size = opt.batch_size, shuffle = False, pin_memory = True)
+    pin_memory = (opt.device != 'cpu')
+    dataloader = torch.utils.data.DataLoader(dataset=dataset, batch_size=opt.batch_size, shuffle=False, pin_memory=pin_memory)
+
     pred = np.empty((0, opt.input_dim))
     model.to(opt.device, non_blocking=True)
     for idx, (con, sty) in enumerate(dataloader):
@@ -67,12 +69,28 @@ def train_model(opt, dataset):
 
     model = scperb(opt)
     
+    # Move model to device BEFORE loading checkpoint (if resuming)
+    model.to(opt.device)
+    
     if opt.resume == True:
         model.load(opt.model_save_path + '/'  + opt.exclude_celltype + '_now_epoch.pt')
     
-    model.to(opt.device, non_blocking=True)
+    # Ensure model is on correct device
+    model.to(opt.device)
     
-    dataloader = torch.utils.data.DataLoader(dataset = dataset, batch_size = opt.batch_size, shuffle = True, pin_memory = True)
+    # Verify device placement
+    if opt.device != 'cpu':
+        print(f"Model device check: {next(model.model.parameters()).device}")
+    
+    # Use pin_memory=True only if using CUDA for faster data transfer
+    pin_memory = (opt.device != 'cpu')
+    dataloader = torch.utils.data.DataLoader(
+        dataset=dataset, 
+        batch_size=opt.batch_size, 
+        shuffle=True, 
+        pin_memory=pin_memory,
+        num_workers=opt.num_workers
+    )
 
     scores = -1
     best_model = 0
@@ -92,7 +110,7 @@ def train_model(opt, dataset):
 
         model.save(opt.model_save_path + '/'  + opt.exclude_celltype + '_now_epoch.pt')
         if epoch % 10 == 0:
-            tmp_scores, mean, var = validation(opt, model)
+            tmp_scores, mean, var = validation(opt, model, dataset)
         best_model, scores = utils.bestmodel(scores, tmp_scores, epoch, best_model, model)
         
         utils.update_pbar(loss, scores, best_model, pbar, mean, var, tmp_scores)
@@ -104,15 +122,25 @@ def fix_seed(opt):
     torch.backends.cudnn.benchmark = False
     np.random.seed(opt.seed)
 
-def get_res(opt, model_type = "best"):
+def get_res(opt, dataset, model_type = "best"):
     model = scperb(opt)
+    
+    # Move model to device BEFORE loading
+    model.to(opt.device)
     
     if model_type == "best":
         model.load(opt.model_save_path + '/'  + opt.exclude_celltype + '_best_epoch.pt')
     else:
         model.load(opt.model_save_path + '/'  + opt.exclude_celltype + '_now_epoch.pt')
     
-    predicts = validation(opt, model, True)
+    # Ensure model is on correct device after loading
+    model.to(opt.device)
+    
+    # Verify device placement
+    if opt.device != 'cpu':
+        print(f"Model device check: {next(model.model.parameters()).device}")
+    
+    predicts = validation(opt, model, dataset, True)
     valid = sc.read(opt.read_valid_path)
     pred = anndata.AnnData(predicts, obs={opt.condition_key: [opt.pred_key] * len(predicts), opt.cell_type_key: [opt.exclude_celltype] * len(predicts)}, var={"var_names": valid.var_names})
     if model_type == 'best':
@@ -124,6 +152,17 @@ if __name__ == '__main__':
     Opt = options()
     opt = Opt.init()
     print(opt)
+    
+    # Verify device is set correctly
+    print(f"\n{'='*60}")
+    print(f"Device Configuration:")
+    print(f"  opt.device = '{opt.device}'")
+    if opt.device != 'cpu':
+        print(f"  torch.cuda.is_available() = {torch.cuda.is_available()}")
+        if torch.cuda.is_available():
+            print(f"  CUDA device: {torch.cuda.get_device_name(0)}")
+    print(f"{'='*60}\n")
+    
     fix_seed(opt)
     dataset = customDataloader(opt)
     
@@ -132,8 +171,8 @@ if __name__ == '__main__':
         subprocess.call([command], shell=True)
     
     if opt.validation == True:
-        get_res(opt)
+        get_res(opt, dataset)
     
     else:
         train_model(opt, dataset)
-        get_res(opt)
+        get_res(opt, dataset)

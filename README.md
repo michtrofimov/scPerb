@@ -44,6 +44,13 @@ Traditional methods for obtaining cellular responses after perturbation are usua
     pip install -r requirements.txt
     ```
     
+    **Using Mamba:** Create and activate the env from `requirements.txt` with:
+    ```
+    mamba env create -f environment.yml
+    mamba activate scperb
+    ```
+    See [SETUP.md](SETUP.md) for managing models in a GitHub repo and more Mamba/conda options.
+    
 - **I want to try the PBMC demo, can I run scPerb in one command line?**    
     You can use the following commands:
 

@@ -1,2 +1,19 @@
-
+# OS
 .DS_Store
+
+# Trained model weights and outputs (use releases or external storage, not git)
+*.pt
+*.pth
+*.ckpt
+saved/
+*_saved*/
+supervise_2enc_spaperb_saved_one_loss/
+
+# Data (download via DataDownloader.py or see README)
+data/*.h5ad
+!data/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

@@ -1,0 +1,15 @@
+# Mamba/conda environment for scPerb
+# Create:  mamba env create -f environment.yml
+# Activate: mamba activate scperb
+# Update:   mamba env update -f environment.yml --prune
+
+name: scperb
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+    - -r requirements.txt

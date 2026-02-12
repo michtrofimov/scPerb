@@ -42,6 +42,13 @@ class options():
             opt.cell_type_key = 'cell_type'
             opt.input_dim = 7000
 
+        elif self.opt.data == 'obesity':
+            opt.stim_key = 'stimulated'
+            opt.ctrl_key = 'control'
+            opt.cell_type_key = 'cell_type'
+            if not hasattr(opt, 'input_dim') or opt.input_dim is None:
+                opt.input_dim = 10000  # override in notebook from adata.n_vars
+
         self.opt = opt
             
     def make_dic(self):
@@ -52,8 +59,28 @@ class options():
         os.makedirs(opt.result_save_path, exist_ok=True)
 
     def check_device(self):
+        # Override device if CUDA is available and user hasn't explicitly set it to CPU
         if torch.cuda.is_available():
-            self.opt.device = 'cuda'
+            if self.opt.device == 'cpu':
+                # Auto-detect: CUDA available, switch to GPU
+                self.opt.device = 'cuda'
+                print(f"✓ CUDA available: Using GPU (device: {self.opt.device})")
+            else:
+                # User specified device, use it
+                print(f"Using device: {self.opt.device}")
+        else:
+            # CUDA not available, ensure CPU is used
+            if self.opt.device == 'cuda':
+                print(f"⚠ Warning: CUDA requested but not available. Falling back to CPU.")
+                self.opt.device = 'cpu'
+            else:
+                print(f"CUDA not available: Using CPU (device: {self.opt.device})")
+        
+        # Print CUDA info for debugging
+        if torch.cuda.is_available():
+            print(f"  CUDA device count: {torch.cuda.device_count()}")
+            print(f"  Current CUDA device: {torch.cuda.current_device()}")
+            print(f"  CUDA device name: {torch.cuda.get_device_name(0)}")
 
     def get_save_path(self):
         opt = self.opt
@@ -111,7 +138,7 @@ class options():
         parser.add_argument("--plot_only", type=bool, default=False, help="Whether it is validation or not.")
         parser.add_argument("--plot", type=bool, default=False, help="Whether to plot or not.")
 
-        parser.add_argument("--device", type = str, default = 'cpu', help = "Which device to use.")
+        parser.add_argument("--device", type = str, default = 'cuda', help = "Which device to use.")
 
         parser.add_argument('--seed', type=int, default=42)
         parser.add_argument("--use_model", type=str, default='all', help="Wheter to use the best model to predict or not.")
